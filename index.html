@@ -55,8 +55,18 @@
         .block-vocabulary { border-color: #f59e0b; background-color: #fffbeb; }
         .input-style { width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; resize: vertical; font-size: 1rem; transition: all 0.2s; }
         .input-style:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
-        .grammar-blank { display: inline-block; width: 100px; border-bottom: 2px solid #374151; margin: 0 0.5rem; text-align: center; font-weight: 500; }
+        .grammar-blank { display: inline-block; min-width: 100px; max-width: 150px; border-bottom: 2px solid #374151; margin: 0 0.5rem; text-align: center; font-weight: 500; }
         
+        .grammar-input {
+            border: 1px solid #ccc;
+            padding: 4px 6px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: 600;
+            color: #1e40af;
+            width: 100%;
+        }
+
         /* --- Loading Screen Styling --- */
         .spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #4f46e5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -70,7 +80,7 @@
         <div id="step-1" class="current-step">
             <header class="text-center mb-10">
                 <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
-                <p class="text-xl font-medium text-indigo-600 mt-2">Step 1: Choose Your Content Source</p>
+                <p class="text-xl font-medium text-indigo-600 mt-2">Step 1: Choose Your Topic</p>
                 <p class="text-gray-500 mt-1">Select one or more topics, search, or upload a file for context.</p>
             </header>
 
@@ -216,11 +226,44 @@
             </div>
 
 
-            <!-- Footer for Step 4 -->
-            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-end">
-                <button class="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg transition duration-300 hover:bg-indigo-700">
+            <!-- Footer for Step 4 (UPDATED NAVIGATION) -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-between">
+                <div class="space-x-4">
+                     <button id="step-4-back-to-prev" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                        ← Back to Difficulty
+                    </button>
+                    <button id="step-4-back-to-start" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                        Back to Beginning
+                    </button>
+                </div>
+                <button id="submit-assignments" class="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg transition duration-300 hover:bg-indigo-700">
                     Submit Assignments
                 </button>
+            </footer>
+        </div>
+
+        <!-- STEP 5: Feedback Presentation -->
+        <div id="step-5" class="hidden">
+            <header class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
+                <p class="text-xl font-medium text-green-600 mt-2">Assignment Feedback & Results</p>
+                <p class="text-gray-500 mt-1">Topic: <span id="feedback-topic-display" class="font-semibold text-gray-700"></span> | Level: <span id="feedback-level-display" class="font-semibold text-gray-700"></span></p>
+            </header>
+
+            <div id="feedback-content" class="space-y-6">
+                <!-- Feedback will be injected here -->
+            </div>
+
+            <!-- Footer for Step 5 (UPDATED NAVIGATION) -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-between">
+                <div class="space-x-4">
+                    <button id="step-5-back-to-prev" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                        ← Back to My Assignment
+                    </button>
+                    <button id="step-5-back-to-start" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                        Back to Beginning
+                    </button>
+                </div>
             </footer>
         </div>
 
@@ -230,18 +273,14 @@
         // --- GLOBAL STATE MANAGEMENT ---
         const appState = {
             currentStep: 1,
-            selectedTopic: null, // Stores the primary topic string
-            selectedAssignments: new Set(), // Stores IDs of selected assignment cards
-            cefrLevel: 'B2', // Default value updated to B2 (index 3)
-            generatedAssignments: []
+            selectedTopic: null, 
+            selectedAssignments: new Set(), 
+            cefrLevel: 'B2', 
+            generatedAssignments: [], // Stores the generated prompt/instructions
+            submissionResults: null // Stores the user's answers and grading results
         };
 
-        // LLM Configuration (Mocking will be used as a priority)
-        const API_KEY = ""; 
-        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
-        
-        // --- DATA STRUCTURES ---
+        // --- DATA STRUCTURES (MOCK & CONSTANTS) ---
 
         const TOPICS = [
             { id: 'topic-tech', name: 'Technology', icon: '🤖' },
@@ -267,40 +306,155 @@
             { level: 'C2', name: 'Proficiency', description: 'Can understand virtually everything heard or read.' }
         ];
 
-        // Priority for rendering assignments in Step 4
-        const ASSIGNMENT_PRIORITY = [
-            'WritingPrompt',    // 1st Priority
-            'GrammarPractice',  // 2nd Priority
-            'VocabularyWords'   // 3rd Priority
+        const ASSIGNMENT_PRIORITY = ['WritingPrompt', 'GrammarPractice', 'VocabularyWords'];
+
+        // EXPANDED MOCK ASSIGNMENT POOL with simple correct answers for GrammarPractice
+        const MOCK_ASSIGNMENT_POOL = [
+            // ==================================================================================
+            // --------------------------------- A2 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'A2', topicKey: 'Technology',
+                generatedTitle: 'My Favorite App',
+                promptOrInstructions: 'Write 5-7 simple sentences about an app you use every day. Describe what it does and why you like it.',
+                contentDetail: 'Focus on using the present tense and simple adjectives like good, fun, fast, and easy.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'A2', topicKey: 'History',
+                generatedTitle: 'Past Simple Verbs: World Events',
+                promptOrInstructions: 'Complete the sentences about history using the past simple form of the verb in parentheses to fill the blank.',
+                contentDetail: [
+                    "They ___ a famous battle in 1066. (fight)",
+                    "Christopher Columbus ___ America in 1492. (discover)",
+                    "The teacher ___ us a documentary about Ancient Egypt. (show)",
+                    "The scientist ___ the lightbulb in 1879. (invent)"
+                ].join('\n'),
+                correctAnswers: ["fought", "discovered", "showed", "invented"]
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'A2', topicKey: 'Environment',
+                generatedTitle: 'Basic Nature Nouns',
+                promptOrInstructions: 'Define these simple nature words and write one simple sentence for each, describing its location or color.',
+                contentDetail: [
+                    "1. Tree (n): A tall plant with a trunk and branches.",
+                    "2. River (n): A large natural stream of water.",
+                    "3. Cloud (n): A white or grey mass in the sky.",
+                    "4. Flower (n): The part of a plant that is often brightly colored."
+                ].join('\n')
+            },
+            
+            // ==================================================================================
+            // --------------------------------- B1 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'B1', topicKey: 'Technology',
+                generatedTitle: 'Social Media: Good or Bad?',
+                promptOrInstructions: 'Write two paragraphs (about 100-150 words total) expressing your opinion on whether social media is generally beneficial or harmful for people.',
+                contentDetail: 'Use appropriate linking words (e.g., *however*, *on the other hand*) and supporting reasons to structure your argument.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'B1', topicKey: 'History',
+                generatedTitle: 'Active vs. Passive Voice',
+                promptOrInstructions: 'Fill in the blanks using the correct form of the verb in parentheses. Note the passive voice may be needed.',
+                contentDetail: [
+                    "The original script ___ (write) by Shakespeare.",
+                    "Many important historical records ___ (keep) in the city archive.",
+                    "Before the invention of the car, long distances ___ (travel) on horses.",
+                    "They believe the palace ___ (build) around 1600."
+                ].join('\n'),
+                correctAnswers: ["was written", "are kept", "were traveled", "was built"]
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'B1', topicKey: 'Environment',
+                generatedTitle: 'Simple Climate Action Vocabulary',
+                promptOrInstructions: 'Define and write a B1-level compound sentence using each of the following words in the context of environmental protection.',
+                contentDetail: [
+                    "1. Pollution (n): Harmful substances in the environment.",
+                    "2. Recycle (v): Convert waste into reusable material.",
+                    "3. Impact (n): A strong effect on something.",
+                    "4. Reserve (n): An area of land protected for animals."
+                ].join('\n')
+            },
+
+            // ==================================================================================
+            // --------------------------------- B2 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'B2', topicKey: 'Technology',
+                generatedTitle: 'The Ethics of Artificial Intelligence',
+                promptOrInstructions: 'Write a four-paragraph, cohesive essay (approx. 250 words) on a potential ethical dilemma posed by Artificial Intelligence (AI). Focus on clear topic sentences and logical paragraph transitions.',
+                contentDetail: 'The essay should be formally structured with a clear introduction and conclusion. Use relative clauses and inversion for complex sentence variety.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'B2', topicKey: 'History',
+                generatedTitle: 'Conditional & Modal Perfects',
+                promptOrInstructions: 'Fill in the blanks with the most appropriate form of the verb in parentheses (often involving a conditional or modal perfect).',
+                contentDetail: [
+                    "If they had known the danger, they ___ (not go) to war.",
+                    "He looks tired; he ___ (work) late last night.",
+                    "The artifacts ___ (find) earlier if the excavation had been deeper.",
+                    "The general ordered the retreat, saying the situation ___ (become) critical."
+                ].join('\n'),
+                correctAnswers: ["would not have gone", "must have worked", "would have been found", "had become"]
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'B2', topicKey: 'Environment',
+                generatedTitle: 'Intermediate Environmental Terms',
+                promptOrInstructions: 'Define and write a sentence for each word demonstrating your B2-level understanding of its use in environmental discussions.',
+                contentDetail: [
+                    "1. Sustainable (adj): Able to be maintained at a certain rate or level.",
+                    "2. Ecosystem (n): A biological community of interacting organisms and their physical environment.",
+                    "3. Consumption (n): The using up of a resource.",
+                    "4. Depletion (n): Reduction in the number or quantity of something."
+                ].join('\n')
+            },
+
+            // ==================================================================================
+            // --------------------------------- C1 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'C1', topicKey: 'Technology',
+                generatedTitle: 'Critique of Digital Privacy Legislation',
+                promptOrInstructions: 'Compose a 400-word academic critique analyzing the efficacy and philosophical implications of current digital privacy legislation (e.g., GDPR). Maintain a formal, objective tone.',
+                contentDetail: 'Ensure advanced grammatical structures are used, such as inversion (e.g., *Seldom have we seen...*) and nominalization (e.g., *the measurement of data*).'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'C1', topicKey: 'History',
+                generatedTitle: 'Inverted Conditionals & Nominalization',
+                promptOrInstructions: 'Fill the blanks with the appropriate advanced form, often requiring inverted conditionals or complex structures.',
+                contentDetail: [
+                    "___ (be) the treaty signed, peace would have broken out sooner. (Inverted Conditional)",
+                    "The government decided to impose sanctions; this ___ (lead) to an immediate economic crisis.",
+                    "Only after the records were digitized ___ (they realize) the full extent of the discovery.",
+                ].join('\n'),
+                correctAnswers: ["Had been", "led", "did they realize"]
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'C1', topicKey: 'Environment',
+                generatedTitle: 'Academic Ecological Terminology',
+                promptOrInstructions: 'Define and write a complex, C1-level sentence for each term, demonstrating its precise use in scientific or policy contexts.',
+                contentDetail: [
+                    "1. Anthropogenic (adj): Originating in human activity.",
+                    "2. Mitigation (n): The action of reducing the severity, seriousness, or painfulness of something.",
+                    "3. Ubiquitous (adj): Present, appearing, or found everywhere.",
+                    "4. Nexus (n): A connection or series of connections linking two or more things."
+                ].join('\n')
+            },
         ];
 
-        // LLM JSON Schema for Structured Output (not used in mock, but kept for completeness)
-        const LLM_RESPONSE_SCHEMA = {
-            type: "ARRAY",
-            items: {
-                type: "OBJECT",
-                properties: {
-                    assignmentType: { 
-                        type: "STRING", 
-                        description: "Must be one of: WritingPrompt, GrammarPractice, or VocabularyWords." 
-                    },
-                    generatedTitle: { 
-                        type: "STRING", 
-                        description: "A short, descriptive title for the assignment." 
-                    },
-                    promptOrInstructions: { 
-                        type: "STRING", 
-                        description: "The main instruction text for the student." 
-                    },
-                    contentDetail: { 
-                        type: "STRING", 
-                        description: "The raw content of the assignment (e.g., the essay topic, the grammar sentences with blanks/verbs, or the vocabulary list/definitions). Use '___' to denote blanks in grammar sentences." 
-                    }
-                },
-                required: ["assignmentType", "generatedTitle", "promptOrInstructions", "contentDetail"]
-            }
-        };
-        
+        // Fallback for combinations not explicitly mocked (Updated for grading)
+        const DEFAULT_FALLBACK_ASSIGNMENT = (type, topic, level) => ({
+            assignmentType: type,
+            generatedTitle: `[${type}] ${topic} - Level ${level} (Dynamic Fallback)`,
+            promptOrInstructions: `A specific mock assignment for Topic: '${topic}' and Level: '${level}' was not found. Here is a **dynamically generated fallback** that maintains the complexity of the **${level}** level.`,
+            contentDetail: type === 'GrammarPractice' ? 
+                `Complex conditional structures ___ (be) necessary for advanced academic writing. (Use inversion)` : 
+                (type === 'WritingPrompt' ? 
+                    `Write an analytical summary (200 words) on how ${topic} has influenced modern society, ensuring formal register and complex syntax appropriate for a ${level} learner.` : 
+                    `1. Prerequisite (n): A condition that must be met before something else can happen. Use this word in a formal sentence related to ${topic}.`),
+            correctAnswers: type === 'GrammarPractice' ? ["would have been"] : []
+        });
+
         // --- UI UTILITY FUNCTIONS ---
         
         function getElement(id) {
@@ -308,7 +462,7 @@
         }
 
         function showStep(stepId) {
-            const steps = [1, 2, 3, 4, 'loading'];
+            const steps = [1, 2, 3, 4, 5, 'loading'];
             const container = getElement('app-container');
             
             const stepName = (typeof stepId === 'string' && stepId === 'loading') ? 'loading-screen' : `step-${stepId}`;
@@ -342,8 +496,7 @@
 
         function updateSelectedTopicDisplay(topicName) {
             if (topicName) {
-                // Only clear search if topic came from a card/file
-                if (!topicName.startsWith('Search:')) {
+                if (!topicName.startsWith('Search:') && !topicName.startsWith('File Upload:')) {
                      getElement('topic-search').value = '';
                 }
                 getElement('file-name-display').textContent = `Primary Topic: ${topicName}`;
@@ -355,14 +508,12 @@
         function toggleTopic(topicId, element) {
             const topicName = TOPICS.find(t => t.id === topicId).name;
 
-            // Clear previous selection
             document.querySelectorAll('.card-topic.selected').forEach(card => {
                 if (card.id !== topicId) {
                     card.classList.remove('selected');
                 }
             });
 
-            // Set the new/current selection
             if (element.classList.contains('selected')) {
                 element.classList.remove('selected');
                 appState.selectedTopic = null;
@@ -375,31 +526,25 @@
             updateNextButtonStep1();
         }
         
-        // Event listener for Search Input
         function handleSearchInput() {
             const searchInput = getElement('topic-search');
             const searchValue = searchInput.value.trim();
             
-            // Clear card selection if search is active
             document.querySelectorAll('.card-topic.selected').forEach(card => card.classList.remove('selected'));
             
             if (searchValue) {
                 appState.selectedTopic = `Search: ${searchValue}`;
             } else if (appState.selectedTopic && appState.selectedTopic.startsWith('Search:')) {
-                 // If search was the source and it's now empty, clear topic
                 appState.selectedTopic = null;
             }
-            // Retain file selection if present
             
             updateSelectedTopicDisplay(appState.selectedTopic);
             updateNextButtonStep1();
         }
 
-        // Event listener for File Input (treated as a custom topic source)
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (file) {
-                // Clear card and search selection
                 document.querySelectorAll('.card-topic.selected').forEach(card => card.classList.remove('selected'));
                 getElement('topic-search').value = '';
                 
@@ -463,7 +608,6 @@
                 content.classList.remove('open');
                 icon.textContent = '▼';
             } else {
-                // Populate full descriptions before opening
                 content.innerHTML = CEFR_LEVELS.map(data => 
                     `<p class="mb-2"><strong class="text-indigo-600">${data.level} (${data.name}):</strong> ${data.description}</p>`
                 ).join('');
@@ -472,177 +616,27 @@
             }
         }
         
-        // --- LLM GENERATION & API LOGIC (REMOVED: Using MOCK only now) ---
+        // --- LLM GENERATION & MOCK API ---
 
-        // --- MOCK API (For demonstration with robust filtering) ---
-        
-        // EXPANDED MOCK ASSIGNMENT POOL
-        // Topic Key must be a single word (e.g., 'Technology') for simple matching against TOPICS array names
-        const MOCK_ASSIGNMENT_POOL = [
-            // ==================================================================================
-            // --------------------------------- A2 LEVEL ASSIGNMENTS ---------------------------
-            // ==================================================================================
-            {
-                assignmentType: 'WritingPrompt', level: 'A2', topicKey: 'Technology',
-                generatedTitle: 'My Favorite App',
-                promptOrInstructions: 'Write 5-7 simple sentences about an app you use every day. Describe what it does and why you like it.',
-                contentDetail: 'Focus on using the present tense and simple adjectives like good, fun, fast, and easy.'
-            },
-            {
-                assignmentType: 'GrammarPractice', level: 'A2', topicKey: 'History',
-                generatedTitle: 'Past Simple Verbs: World Events',
-                promptOrInstructions: 'Complete the sentences about history using the past simple form of the verb in parentheses.',
-                contentDetail: [
-                    "They ___ (fight) a famous battle in 1066.",
-                    "Christopher Columbus ___ (discover) America in 1492.",
-                    "The teacher ___ (show) us a documentary about Ancient Egypt.",
-                    "The scientist ___ (invent) the lightbulb in 1879."
-                ].join('\n')
-            },
-            {
-                assignmentType: 'VocabularyWords', level: 'A2', topicKey: 'Environment',
-                generatedTitle: 'Basic Nature Nouns',
-                promptOrInstructions: 'Define these simple nature words (e.g., tree, sky) and write one simple sentence for each, describing its location or color.',
-                contentDetail: [
-                    "1. Tree (n): A tall plant with a trunk and branches.",
-                    "2. River (n): A large natural stream of water.",
-                    "3. Cloud (n): A white or grey mass in the sky.",
-                    "4. Flower (n): The part of a plant that is often brightly colored."
-                ].join('\n')
-            },
-            
-            // ==================================================================================
-            // --------------------------------- B1 LEVEL ASSIGNMENTS ---------------------------
-            // ==================================================================================
-            {
-                assignmentType: 'WritingPrompt', level: 'B1', topicKey: 'Technology',
-                generatedTitle: 'Social Media: Good or Bad?',
-                promptOrInstructions: 'Write two paragraphs (about 100-150 words total) expressing your opinion on whether social media is generally beneficial or harmful for people.',
-                contentDetail: 'Use appropriate linking words (e.g., *however*, *on the other hand*) and supporting reasons to structure your argument.'
-            },
-            {
-                assignmentType: 'GrammarPractice', level: 'B1', topicKey: 'History',
-                generatedTitle: 'Active vs. Passive Voice',
-                promptOrInstructions: 'Rewrite the following historical sentences, changing the voice as indicated in parentheses.',
-                contentDetail: [
-                    "A famous artist painted the Mona Lisa. (Change to Passive)",
-                    "The book was finished by the writer in 1950. (Change to Active)",
-                    "They believe that the war ended in 1945. (Change to Passive: Impersonal)",
-                    "The government decided to build a new monument. (Change to Passive)"
-                ].join('\n')
-            },
-            {
-                assignmentType: 'VocabularyWords', level: 'B1', topicKey: 'Environment',
-                generatedTitle: 'Simple Climate Action Vocabulary',
-                promptOrInstructions: 'Define and write a B1-level compound sentence using each of the following words in the context of environmental protection.',
-                contentDetail: [
-                    "1. Pollution (n): Harmful substances in the environment.",
-                    "2. Recycle (v): Convert waste into reusable material.",
-                    "3. Impact (n): A strong effect on something.",
-                    "4. Reserve (n): An area of land protected for animals."
-                ].join('\n')
-            },
-
-            // ==================================================================================
-            // --------------------------------- B2 LEVEL ASSIGNMENTS ---------------------------
-            // ==================================================================================
-            {
-                assignmentType: 'WritingPrompt', level: 'B2', topicKey: 'Technology',
-                generatedTitle: 'The Ethics of Artificial Intelligence',
-                promptOrInstructions: 'Write a four-paragraph, cohesive essay (approx. 250 words) on a potential ethical dilemma posed by Artificial Intelligence (AI). Focus on clear topic sentences and logical paragraph transitions.',
-                contentDetail: 'The essay should be formally structured with a clear introduction and conclusion. Use relative clauses and inversion for complex sentence variety.'
-            },
-            {
-                assignmentType: 'GrammarPractice', level: 'B2', topicKey: 'History',
-                generatedTitle: 'Reported Speech & Speculation',
-                promptOrInstructions: 'Rewrite the following direct speech into reported speech, using appropriate reporting verbs. Then, rewrite the final sentence using a perfect modal of speculation.',
-                contentDetail: [
-                    "The general said, 'We must retreat immediately.' (Reported)",
-                    "A witness claimed, 'I saw the incident happen near the wall.' (Reported)",
-                    "It's possible that the ancient city was abandoned due to drought. (Speculation: *might have* / *must have*)"
-                ].join('\n')
-            },
-            {
-                assignmentType: 'VocabularyWords', level: 'B2', topicKey: 'Environment',
-                generatedTitle: 'Intermediate Environmental Terms',
-                promptOrInstructions: 'Define and write a sentence for each word demonstrating your B2-level understanding of its use in environmental discussions.',
-                contentDetail: [
-                    "1. Sustainable (adj): Able to be maintained at a certain rate or level.",
-                    "2. Ecosystem (n): A biological community of interacting organisms and their physical environment.",
-                    "3. Consumption (n): The using up of a resource.",
-                    "4. Depletion (n): Reduction in the number or quantity of something."
-                ].join('\n')
-            },
-
-            // ==================================================================================
-            // --------------------------------- C1 LEVEL ASSIGNMENTS ---------------------------
-            // ==================================================================================
-            {
-                assignmentType: 'WritingPrompt', level: 'C1', topicKey: 'Technology',
-                generatedTitle: 'Critique of Digital Privacy Legislation',
-                promptOrInstructions: 'Compose a 400-word academic critique analyzing the efficacy and philosophical implications of current digital privacy legislation (e.g., GDPR). Maintain a formal, objective tone.',
-                contentDetail: 'Ensure advanced grammatical structures are used, such as inversion (e.g., *Seldom have we seen...*) and nominalization (e.g., *the measurement of data*).'
-            },
-            {
-                assignmentType: 'GrammarPractice', level: 'C1', topicKey: 'History',
-                generatedTitle: 'Inverted Conditionals & Nominalization',
-                promptOrInstructions: 'Rewrite the sentences using the specified advanced syntax (inverted conditional or nominalization).',
-                contentDetail: [
-                    "If the explorers had not brought better supplies, they would not have survived the winter. (Rewrite using Inverted Conditional)",
-                    "The historian concluded that the revolution was inevitable. (Rewrite using Nominalization: *The historian's conclusion...*)",
-                    "We need to implement these policies immediately. (Rewrite using Nominalization)"
-                ].join('\n')
-            },
-            {
-                assignmentType: 'VocabularyWords', level: 'C1', topicKey: 'Environment',
-                generatedTitle: 'Academic Ecological Terminology',
-                promptOrInstructions: 'Define and write a complex, C1-level sentence for each term, demonstrating its precise use in scientific or policy contexts.',
-                contentDetail: [
-                    "1. Anthropogenic (adj): Originating in human activity.",
-                    "2. Mitigation (n): The action of reducing the severity, seriousness, or painfulness of something.",
-                    "3. Ubiquitous (adj): Present, appearing, or found everywhere.",
-                    "4. Nexus (n): A connection or series of connections linking two or more things."
-                ].join('\n')
-            },
-        ];
-
-        // Fallback for combinations not explicitly mocked
-        const DEFAULT_FALLBACK_ASSIGNMENT = (type, topic, level) => ({
-            assignmentType: type,
-            generatedTitle: `[${type}] ${topic} - Level ${level} (Dynamic Fallback)`,
-            promptOrInstructions: `A specific mock assignment for Topic: '${topic}' and Level: '${level}' was not found. Here is a **dynamically generated fallback** that maintains the complexity of the **${level}** level.`,
-            contentDetail: type === 'GrammarPractice' ? 
-                `Complex conditional structures ___ (be) necessary for advanced academic writing. (Use inversion)` : 
-                (type === 'WritingPrompt' ? 
-                    `Write an analytical summary (200 words) on how ${topic} has influenced modern society, ensuring formal register and complex syntax appropriate for a ${level} learner.` : 
-                    `1. Prerequisite (n): A condition that must be met before something else can happen. Use this word in a formal sentence related to ${topic}.`)
-        });
+        const topicMatches = (mockTopicKey, targetTopicLower) => {
+            const keyLower = mockTopicKey.toLowerCase();
+            return targetTopicLower.includes(keyLower);
+        };
 
         async function mockGenerateAssignment() {
             const selectedTypes = Array.from(appState.selectedAssignments).map(id => ASSIGNMENT_TYPES.find(a => a.id === id).type);
             const generatedAssignments = [];
             
-            // Determine the target level and a simplified topic key for matching
             const targetLevel = appState.cefrLevel;
-            // Normalize selected topic to lowercase for flexible matching
             const targetTopicLower = appState.selectedTopic.toLowerCase();
             
-            // Helper to check if the mock data's topic key is found in the user's selected topic
-            const topicMatches = (mockTopicKey) => {
-                const keyLower = mockTopicKey.toLowerCase();
-                // Check if the mock key is found within the selected topic (e.g., 'tech' in 'Search: cool tech concepts')
-                return targetTopicLower.includes(keyLower);
-            };
-
             for (const type of selectedTypes) {
-                // 1. Try to find a specific match (Type + Level + Topic)
                 let match = MOCK_ASSIGNMENT_POOL.find(a => 
                     a.assignmentType === type && 
                     a.level === targetLevel && 
-                    topicMatches(a.topicKey)
+                    topicMatches(a.topicKey, targetTopicLower)
                 );
                 
-                // 2. If no specific match, fall back to a generic assignment for the level
                 if (!match) {
                     match = DEFAULT_FALLBACK_ASSIGNMENT(type, appState.selectedTopic, targetLevel);
                 }
@@ -650,7 +644,6 @@
                 generatedAssignments.push(match);
             }
 
-            // Simulate network latency and processing time
             getElement('loading-message').textContent = `Fetching highly personalized mock content for Level ${appState.cefrLevel} on Topic: ${appState.selectedTopic}. All filters are now active!`;
             await new Promise(resolve => setTimeout(resolve, 3000)); 
             
@@ -664,16 +657,13 @@
                  return;
             }
 
-            // 1. Transition to Loading Screen
             showStep('loading');
 
             try {
-                // 2. Call the MOCK API
                 const generatedAssignments = await mockGenerateAssignment(); 
                 
                 appState.generatedAssignments = generatedAssignments;
                 
-                // 3. Render Step 4
                 renderStep4(generatedAssignments);
                 showStep(4);
 
@@ -689,16 +679,19 @@
 
         // --- STEP 4 LOGIC (Assignment Rendering) ---
         
-        function getAssignmentTemplate(assignmentData) {
-            const { assignmentType, generatedTitle, promptOrInstructions, contentDetail } = assignmentData;
+        let grammarInputIndex = 0; // Global counter for unique grammar input IDs
 
+        function getAssignmentTemplate(assignmentData, index) {
+            const { assignmentType, generatedTitle, promptOrInstructions, contentDetail } = assignmentData;
+            const assignmentId = `assign-${index}`; // Unique ID for assignment block
+            
             // Template for Writing (Essay) Assignment
             if (assignmentType === 'WritingPrompt') {
                 return {
                     description: promptOrInstructions,
                     content: `
                         <p class="text-gray-700 mb-4 font-medium">Prompt Details: ${contentDetail}</p>
-                        <textarea class="input-style h-64" placeholder="Start writing your essay here..."></textarea>
+                        <textarea id="${assignmentId}-input-0" class="input-style h-64" placeholder="Start writing your essay here..."></textarea>
                         <p class="text-sm text-gray-500 mt-2 text-right">Word Count: 0 (Manual entry)</p>
                     `,
                     colorClass: 'block-writing'
@@ -707,17 +700,33 @@
             
             // Template for Grammar (Fill-in-the-Blank) Assignment
             if (assignmentType === 'GrammarPractice') {
+                grammarInputIndex = 0; // Reset index for this assignment block
                 const sentences = contentDetail.split('\n').filter(s => s.trim().length > 0);
-                const listItems = sentences.map((sentence, index) => {
-                    const formattedSentence = sentence.replace(/___/g, 
-                        `<span class="grammar-blank"><input type="text" class="input-style p-1 h-8 text-center" placeholder="Answer"></span>`
-                    );
-                    return `<li>${formattedSentence}</li>`;
+                
+                const listItems = sentences.map((sentence, itemIndex) => {
+                    // Extract verb in parentheses (if present)
+                    const verbMatch = sentence.match(/\((.*?)\)/);
+                    const verbHint = verbMatch ? verbMatch[1] : '';
+                    
+                    // Replace the blank marker '___' with an input field
+                    const formattedSentence = sentence
+                        .replace('___', `
+                            <span class="grammar-blank" data-index="${grammarInputIndex}">
+                                <input type="text" 
+                                       id="${assignmentId}-input-${grammarInputIndex++}"
+                                       class="grammar-input" 
+                                       placeholder="${verbHint || 'Answer'}"
+                                       data-correct="${(assignmentData.correctAnswers[itemIndex] || '').toLowerCase()}"
+                                >
+                            </span>
+                        `);
+                    
+                    return `<li class="text-gray-800">${formattedSentence.replace(/\(.*\)/g, '')}</li>`; // Remove verb hint from displayed sentence
                 }).join('');
 
                 return {
                     description: promptOrInstructions,
-                    content: `<ol class="list-decimal list-inside space-y-4 text-gray-800">${listItems}</ol>`,
+                    content: `<ol class="list-decimal list-inside space-y-4 text-gray-800" data-assignment-type="GrammarPractice">${listItems}</ol>`,
                     colorClass: 'block-grammar'
                 };
             }
@@ -725,7 +734,7 @@
             // Template for Vocabulary Assignment
             if (assignmentType === 'VocabularyWords') {
                 const vocabItems = contentDetail.split('\n').filter(s => s.trim().length > 0);
-                const vocabBlocks = vocabItems.map((item, index) => {
+                const vocabBlocks = vocabItems.map((item, itemIndex) => {
                     const parts = item.split(':').map(s => s.trim());
                     const numberAndWord = parts[0];
                     const definition = parts.slice(1).join(':').trim();
@@ -737,7 +746,7 @@
                         <div class="p-3 border border-gray-200 rounded-lg bg-white">
                             <p class="font-bold text-indigo-700 mb-1">${numberAndWord}:</p>
                             <p class="text-sm text-gray-600 mb-2">Definition: ${definition || 'N/A'}</p>
-                            <input type="text" class="input-style" placeholder="Your sentence using '${word.trim()}' here...">
+                            <input type="text" id="${assignmentId}-input-${itemIndex}" class="input-style" placeholder="Your sentence using '${word.trim()}' here...">
                         </div>
                     `;
                 }).join('');
@@ -768,23 +777,24 @@
                 noMessage.classList.add('hidden');
             }
 
-            // Sort assignments based on the global ASSIGNMENT_PRIORITY
             const sortedAssignments = assignments.sort((a, b) => {
                 const priorityA = ASSIGNMENT_PRIORITY.indexOf(a.assignmentType);
                 const priorityB = ASSIGNMENT_PRIORITY.indexOf(b.assignmentType);
                 return priorityA - priorityB;
             });
 
-
-            // Render blocks in the determined priority order and apply sequential numbering
             sortedAssignments.forEach((assignmentData, index) => {
-                const template = getAssignmentTemplate(assignmentData);
-                
                 const assignmentNumber = index + 1;
+                const template = getAssignmentTemplate(assignmentData, assignmentNumber);
+                
                 const numberedTitle = `Assignment ${assignmentNumber}: ${assignmentData.generatedTitle}`;
                 
                 const block = document.createElement('div');
                 block.className = `assignment-block ${template.colorClass}`;
+                block.dataset.assignmentNumber = assignmentNumber; // Store reference
+                block.dataset.assignmentType = assignmentData.assignmentType; // Store reference
+                block.dataset.title = assignmentData.generatedTitle; // Store reference
+
                 block.innerHTML = `
                     <h2 class="text-2xl font-bold text-gray-900 mb-3">${numberedTitle}</h2>
                     <p class="text-gray-700 mb-6">${template.description}</p>
@@ -796,6 +806,146 @@
             });
         }
         
+        // --- STEP 4 SUBMISSION AND GRADING LOGIC ---
+
+        function gradeGrammarAssignment(assignmentElement, correctAnswers) {
+            const grammarInputs = assignmentElement.querySelectorAll('.grammar-input');
+            let score = 0;
+            let total = 0;
+            const results = [];
+
+            grammarInputs.forEach((input, index) => {
+                const userAnswer = input.value.trim().toLowerCase();
+                const correctAnswer = (correctAnswers[index] || '').toLowerCase();
+                const isCorrect = userAnswer === correctAnswer;
+                
+                total++;
+                if (isCorrect) {
+                    score++;
+                }
+
+                results.push({
+                    sentenceIndex: index + 1,
+                    userAnswer: userAnswer,
+                    correctAnswer: correctAnswer,
+                    isCorrect: isCorrect
+                });
+            });
+
+            return { score, total, results };
+        }
+
+        function submitAssignments() {
+            const assignmentBlocks = document.querySelectorAll('#assignments-workspace .assignment-block');
+            const submissionResults = {
+                grammar: { score: 0, total: 0, assignments: [] },
+                other: [],
+                allSubmittedAssignments: []
+            };
+
+            assignmentBlocks.forEach((block, index) => {
+                const type = block.dataset.assignmentType;
+                const title = block.dataset.title;
+                const assignmentNumber = block.dataset.assignmentNumber;
+                
+                const assignmentData = appState.generatedAssignments.find(a => 
+                    a.assignmentType === type && a.generatedTitle === title // Simple way to match back to the source data
+                );
+
+                const result = {
+                    number: parseInt(assignmentNumber),
+                    type: type,
+                    title: title,
+                    userInput: null
+                };
+
+                if (type === 'GrammarPractice') {
+                    const grade = gradeGrammarAssignment(block, assignmentData.correctAnswers || []);
+                    submissionResults.grammar.score += grade.score;
+                    submissionResults.grammar.total += grade.total;
+                    submissionResults.grammar.assignments.push({ 
+                        title: title, 
+                        score: grade.score, 
+                        total: grade.total, 
+                        results: grade.results 
+                    });
+                    result.userInput = "Graded internally.";
+                } else if (type === 'WritingPrompt') {
+                    const inputElement = getElement(`assign-${assignmentNumber}-input-0`);
+                    result.userInput = inputElement ? inputElement.value : 'N/A';
+                    submissionResults.other.push({ ...result, feedback: "Essay content captured for external review. (No auto-grading available)" });
+                } else if (type === 'VocabularyWords') {
+                    const vocabInputs = block.querySelectorAll('input:not(.grammar-input)');
+                    result.userInput = Array.from(vocabInputs).map(input => input.value);
+                    submissionResults.other.push({ ...result, feedback: "Vocabulary sentences captured for review. (No auto-grading available)" });
+                }
+
+                submissionResults.allSubmittedAssignments.push(result);
+            });
+
+            appState.submissionResults = submissionResults;
+            renderStep5(submissionResults);
+            showStep(5);
+        }
+
+        // --- STEP 5 LOGIC (Feedback Rendering) ---
+
+        function renderStep5(results) {
+            const content = getElement('feedback-content');
+            content.innerHTML = '';
+            
+            // Update Headers
+            getElement('feedback-topic-display').textContent = appState.selectedTopic;
+            getElement('feedback-level-display').textContent = appState.cefrLevel;
+
+            // 1. Overall Grammar Score
+            if (results.grammar.total > 0) {
+                const percentage = Math.round((results.grammar.score / results.grammar.total) * 100);
+                const scoreColor = percentage >= 80 ? 'text-green-600' : (percentage >= 50 ? 'text-yellow-600' : 'text-red-600');
+                
+                content.innerHTML += `
+                    <div class="p-6 bg-indigo-50 border-l-4 border-indigo-500 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Grammar Assessment Summary</h2>
+                        <p class="text-lg text-gray-700">You scored <span class="font-extrabold ${scoreColor}">${results.grammar.score} / ${results.grammar.total}</span> correct answers, achieving a proficiency of <span class="font-extrabold ${scoreColor}">${percentage}%</span>.</p>
+                        <p class="text-sm text-gray-500 mt-2">This score suggests your current proficiency level in tested grammar points is **${percentage >= 80 ? 'Strong' : (percentage >= 50 ? 'Developing' : 'Needs Reinforcement')}** for the **${appState.cefrLevel}** level.</p>
+                    </div>
+                `;
+
+                // Detailed Grammar Feedback
+                results.grammar.assignments.forEach(assign => {
+                    const detailHtml = assign.results.map(res => {
+                        const icon = res.isCorrect ? '✅' : '❌';
+                        const color = res.isCorrect ? 'text-green-700' : 'text-red-700';
+                        const feedback = res.isCorrect ? 'Correct' : `The answer should be: "${res.correctAnswer}"`;
+
+                        return `
+                            <p class="text-sm ${color} border-b border-gray-100 pb-1">
+                                ${icon} Q${res.sentenceIndex}: Your answer was "<span class="font-semibold">${res.userAnswer || '[Empty]'}</span>". ${feedback}
+                            </p>
+                        `;
+                    }).join('');
+
+                    content.innerHTML += `
+                        <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
+                            <h3 class="font-bold text-xl text-indigo-700 mb-3">${assign.title} (${assign.score}/${assign.total})</h3>
+                            <div class="space-y-1">${detailHtml}</div>
+                        </div>
+                    `;
+                });
+            }
+
+            // 2. Feedback for Non-Auto-Graded Assignments (Writing/Vocab)
+            if (results.other.length > 0) {
+                content.innerHTML += `
+                    <div class="p-6 bg-yellow-50 border-l-4 border-yellow-500 rounded-lg shadow-md">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">Qualitative Assignment Review</h2>
+                        <p class="text-md text-gray-700">Your submissions for Writing and Vocabulary have been recorded. These tasks require manual assessment of style, coherence, and accuracy.</p>
+                        <p class="text-sm text-gray-500 mt-2">In a real application, an LLM would now review these submissions to provide detailed feedback on flow, tone, and language complexity relative to the **${appState.cefrLevel}** standard.</p>
+                    </div>
+                `;
+            }
+        }
+
         // --- INITIALIZATION ---
 
         function init() {
@@ -845,7 +995,17 @@
             getElement('step-3-back').addEventListener('click', () => showStep(2));
             getElement('step-3-next-generate').addEventListener('click', startGeneration);
 
-            // Initial state setup: Start slider at index 3 (B2)
+            // Set up Step 4 listeners (NEW NAVIGATION)
+            getElement('step-4-back-to-prev').addEventListener('click', () => showStep(3));
+            getElement('step-4-back-to-start').addEventListener('click', () => showStep(1));
+            getElement('submit-assignments').addEventListener('click', submitAssignments);
+
+            // Set up Step 5 listeners (NEW NAVIGATION)
+            getElement('step-5-back-to-prev').addEventListener('click', () => showStep(4));
+            getElement('step-5-back-to-start').addEventListener('click', () => showStep(1));
+
+
+            // Initial state setup
             updateLevel(slider.value); 
             updateNextButtonStep1();
             updateNextButtonStep2();
