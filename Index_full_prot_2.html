@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PELE - Personalized English Learning Experience</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+        .app-container {
+            background-color: #ffffff;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            max-width: 4xl;
+            width: 100%;
+            border-radius: 1rem;
+            padding: 2rem 1.5rem;
+        }
+
+        /* --- Step 1/2 Styling --- */
+        .card-topic, .card-assignment {
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            user-select: none;
+            border: 3px solid transparent;
+            background-color: #ffffff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+        .card-topic:hover { transform: scale(1.03); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); }
+        .card-topic.selected { border-color: #4f46e5; background-color: #eef2ff; transform: scale(1.03); box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.4); }
+
+        .card-assignment { min-height: 270px; }
+        .card-assignment:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1); }
+        .card-assignment.selected { border-color: #10b981; background-color: #ecfdf5; box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.4); }
+        
+        /* --- Step 3 Styling (Slider) --- */
+        .cefr-range-container { position: relative; width: 100%; padding: 3rem 0; }
+        .cefr-range { -webkit-appearance: none; appearance: none; width: 100%; height: 10px; background: linear-gradient(to right, #a7f3d0, #10b981, #1e3a8a); border-radius: 5px; cursor: pointer; }
+        .cefr-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 28px; height: 28px; background: #ffffff; border: 4px solid #4f46e5; border-radius: 50%; cursor: grab; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); }
+        .cefr-label { width: 40px; text-align: center; font-weight: 700; color: #4f46e5; font-size: 1.25rem; transform: translateX(-50%); position: absolute; top: 0; }
+        .description-content { transition: max-height 0.4s ease-out, opacity 0.4s ease-out; overflow: hidden; max-height: 0; opacity: 1; }
+        .description-content.open { max-height: 500px; opacity: 1; }
+
+        /* --- Step 4/Assignment Styling --- */
+        .assignment-block { border-left: 5px solid; padding: 1.5rem; margin-bottom: 2rem; border-radius: 0.5rem; background-color: #fff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
+        .block-writing { border-color: #4f46e5; background-color: #eef2ff; }
+        .block-grammar { border-color: #10b981; background-color: #ecfdf5; }
+        .block-vocabulary { border-color: #f59e0b; background-color: #fffbeb; }
+        .input-style { width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 0.5rem; resize: vertical; font-size: 1rem; transition: all 0.2s; }
+        .input-style:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px #c7d2fe; outline: none; }
+        .grammar-blank { display: inline-block; width: 100px; border-bottom: 2px solid #374151; margin: 0 0.5rem; text-align: center; font-weight: 500; }
+        
+        /* --- Loading Screen Styling --- */
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); border-left-color: #4f46e5; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="app-container" class="app-container">
+
+        <!-- STEP 1: Topic Selection -->
+        <div id="step-1" class="current-step">
+            <header class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
+                <p class="text-xl font-medium text-indigo-600 mt-2">Step 1: Choose Your Content Source</p>
+                <p class="text-gray-500 mt-1">Select one or more topics, search, or upload a file for context.</p>
+            </header>
+
+            <div class="space-y-8">
+                <!-- Card Selection -->
+                <div class="p-6 bg-indigo-50/50 rounded-xl">
+                    <h2 id="card-selection-title" class="text-xl font-semibold text-gray-700 mb-4">Popular Topics:</h2>
+                    <div id="topic-cards-container" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <!-- Cards will be inserted here by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Search Input -->
+                <div class="p-6 bg-white rounded-xl shadow border border-gray-200">
+                    <label for="topic-search" class="block text-lg font-medium text-gray-700 mb-2">Or, Search for a Specific Topic:</label>
+                    <input type="text" id="topic-search" placeholder="e.g., 'Modern C++ Concepts'" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <!-- File Upload -->
+                <div class="p-6 bg-white rounded-xl shadow border border-gray-200">
+                    <label for="custom-file" class="block text-lg font-medium text-gray-700 mb-2">Or, Upload a Custom Text File (PDF/TXT):</label>
+                    <input type="file" id="custom-file" accept=".txt,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                    <p id="file-name-display" class="mt-2 text-sm text-gray-500">No file selected.</p>
+                </div>
+            </div>
+
+            <!-- Footer for Step 1 -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-end">
+                <button id="step-1-next" disabled class="bg-indigo-400 text-white px-8 py-3 rounded-full font-bold text-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-600">
+                    Next: Assignment Type →
+                </button>
+            </footer>
+        </div>
+
+        <!-- STEP 2: Assignment Type Selection -->
+        <div id="step-2" class="hidden">
+            <header class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
+                <p class="text-xl font-medium text-indigo-600 mt-2">Step 2: Select Assignment Format</p>
+                <p class="text-gray-500 mt-1">Choose up to 3 assignment types. Priority: **English Text Topic** > **Grammar** > **Vocabulary**.</p>
+            </header>
+            
+            <div id="assignment-cards-container" class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <!-- Assignment cards will be rendered here -->
+            </div>
+
+            <!-- Display of Selected Items -->
+            <div class="mt-8 p-4 bg-gray-100 rounded-lg shadow-inner">
+                <p class="text-md font-semibold text-gray-700">Selected Types:</p>
+                <p id="selected-assignments-display" class="mt-1 text-sm text-gray-500 italic">None</p>
+            </div>
+
+            <!-- Footer for Step 2 -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-between">
+                <button id="step-2-back" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                    ← Back to Topic
+                </button>
+                <button id="step-2-next" disabled class="bg-indigo-400 text-white px-8 py-3 rounded-full font-bold text-lg transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-600">
+                    Next: Difficulty Level →
+                </button>
+            </footer>
+        </div>
+
+        <!-- STEP 3: Difficulty Selection -->
+        <div id="step-3" class="hidden">
+            <header class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
+                <p class="text-xl font-medium text-indigo-600 mt-2">Step 3: Select Difficulty Level (CEFR Tuning)</p>
+                <p class="text-gray-500 mt-1">This level determines the complexity of the generated language and tasks.</p>
+            </header>
+
+            <div class="flex flex-col items-center p-8 bg-white rounded-xl shadow-lg border border-indigo-200">
+                
+                <!-- Current Level Display -->
+                <div class="text-center mb-8">
+                    <p class="text-xl text-gray-600 mb-1">Current Level Selection:</p>
+                    <h2 id="current-level-display" class="text-6xl font-extrabold text-indigo-700">B2</h2>
+                    <p id="current-level-description" class="text-lg text-gray-500 italic mt-2">Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers quite possible.</p>
+                </div>
+
+                <!-- CEFR Range Slider -->
+                <div class="cefr-range-container w-full max-w-xl">
+                    <input type="range" min="0" max="5" value="3" id="cefr-slider" class="cefr-range">
+                    <!-- Labels for each step (A1, A2, B1, B2, C1, C2) -->
+                    <div class="flex justify-between absolute w-full bottom-0 text-sm font-medium text-gray-500">
+                        <span style="left: 0%; transform: translateX(-50%); position: absolute;">A1</span>
+                        <span style="left: 20%; transform: translateX(-50%); position: absolute;">A2</span>
+                        <span style="left: 40%; transform: translateX(-50%); position: absolute;">B1</span>
+                        <span style="left: 60%; transform: translateX(-50%); position: absolute;">B2</span>
+                        <span style="left: 80%; transform: translateX(-50%); position: absolute;">C1</span>
+                        <span style="left: 100%; transform: translateX(-50%); position: absolute;">C2</span>
+                    </div>
+                </div>
+
+                <!-- Description Toggle -->
+                <div class="mt-8 w-full max-w-xl">
+                    <div id="description-toggle-header" class="flex justify-between items-center cursor-pointer p-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition">
+                        <span class="font-semibold text-gray-700">CEFR Descriptions</span>
+                        <span id="toggle-icon" class="text-xl text-gray-500">▼</span>
+                    </div>
+                    <div id="cefr-full-description" class="description-content p-4 border border-gray-200 rounded-lg mt-2 bg-white">
+                        <!-- Full descriptions inserted here -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer for Step 3 -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-between">
+                <button id="step-3-back" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-bold text-lg transition duration-300 hover:bg-gray-300">
+                    ← Back to Assignments
+                </button>
+                <!-- This button triggers the LLM generation -->
+                <button id="step-3-next-generate" class="bg-emerald-600 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg transition duration-300 hover:bg-emerald-700 flex items-center">
+                    Generate My Assignments!
+                </button>
+            </footer>
+        </div>
+
+        <!-- LOADING SCREEN (Visible during LLM Call) -->
+        <div id="loading-screen" class="hidden text-center p-20 my-20 bg-indigo-50 rounded-xl shadow-lg border border-indigo-200">
+            <div class="spinner mx-auto mb-6"></div>
+            <h2 class="text-3xl font-bold text-indigo-700 mb-2">Generating Assignments...</h2>
+            <p class="text-gray-600">We are consulting the language model based on your criteria. This may take a moment.</p>
+            <p id="loading-message" class="mt-4 text-sm text-gray-500 italic">Constructing prompt and sending to the API.</p>
+        </div>
+
+        <!-- STEP 4: Assignment Presentation -->
+        <div id="step-4" class="hidden">
+             <header class="text-center mb-10">
+                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Personalized English Learning Experience (PELE)</h1>
+                <p id="step-title" class="text-xl font-medium text-indigo-600 mt-2">My Personal Assignment</p>
+                <p class="text-gray-500 mt-1">Topic: <span id="final-topic-display" class="font-semibold text-gray-700"></span> | Level: <span id="final-level-display" class="font-semibold text-gray-700"></span></p>
+            </header>
+
+            <div id="assignments-workspace">
+                <!-- Generated assignments will be injected here -->
+            </div>
+
+            <div id="no-assignments-message" class="hidden text-center p-10 bg-gray-100 border border-gray-300 rounded-xl">
+                <p class="text-2xl font-bold text-gray-700 mb-2">No Assignments Selected</p>
+                <p class="text-gray-500">Please go back to Step 2 to select an assignment type.</p>
+            </div>
+
+
+            <!-- Footer for Step 4 -->
+            <footer class="mt-12 pt-6 border-t border-gray-200 flex justify-end">
+                <button class="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold text-lg shadow-lg transition duration-300 hover:bg-indigo-700">
+                    Submit Assignments
+                </button>
+            </footer>
+        </div>
+
+    </div>
+
+    <script>
+        // --- GLOBAL STATE MANAGEMENT ---
+        const appState = {
+            currentStep: 1,
+            selectedTopic: null, // Stores the primary topic string
+            selectedAssignments: new Set(), // Stores IDs of selected assignment cards
+            cefrLevel: 'B2', // Default value updated to B2 (index 3)
+            generatedAssignments: []
+        };
+
+        // LLM Configuration (Mocking will be used as a priority)
+        const API_KEY = ""; 
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+        
+        // --- DATA STRUCTURES ---
+
+        const TOPICS = [
+            { id: 'topic-tech', name: 'Technology', icon: '🤖' },
+            { id: 'topic-science', name: 'Science', icon: '🔭' },
+            { id: 'topic-history', name: 'History', icon: '📜' },
+            { id: 'topic-art', name: 'Art & Culture', icon: '🎨' },
+            { id: 'topic-business', name: 'Business', icon: '💰' },
+            { id: 'topic-environment', name: 'Environment', icon: '🌳' },
+        ];
+
+        const ASSIGNMENT_TYPES = [
+            { id: 'assign-writing', name: 'English Text Topic', icon: '📝', description: 'Generates a full prompt for an essay or short story.', type: 'WritingPrompt' },
+            { id: 'assign-grammar', name: 'Grammar Practice', icon: '🧠', description: 'Generates sentences with blanks for conjugation or syntax practice.', type: 'GrammarPractice' },
+            { id: 'assign-vocab', name: 'Vocabulary Words', icon: '📚', description: 'Generates new words with context, requiring students to use them in sentences.', type: 'VocabularyWords' },
+        ];
+
+        const CEFR_LEVELS = [
+            { level: 'A1', name: 'Beginner', description: 'Basic, everyday expressions.' },
+            { level: 'A2', name: 'Elementary', description: 'Simple, routine tasks and direct exchange of information.' },
+            { level: 'B1', name: 'Intermediate', description: 'Can deal with most situations likely to arise whilst travelling.' },
+            { level: 'B2', name: 'Upper-Intermediate', description: 'Can interact with a degree of fluency and spontaneity that makes regular interaction with native speakers quite possible.' },
+            { level: 'C1', name: 'Advanced', description: 'Can express ideas fluently and spontaneously without much obvious searching for expressions.' },
+            { level: 'C2', name: 'Proficiency', description: 'Can understand virtually everything heard or read.' }
+        ];
+
+        // Priority for rendering assignments in Step 4
+        const ASSIGNMENT_PRIORITY = [
+            'WritingPrompt',    // 1st Priority
+            'GrammarPractice',  // 2nd Priority
+            'VocabularyWords'   // 3rd Priority
+        ];
+
+        // LLM JSON Schema for Structured Output (not used in mock, but kept for completeness)
+        const LLM_RESPONSE_SCHEMA = {
+            type: "ARRAY",
+            items: {
+                type: "OBJECT",
+                properties: {
+                    assignmentType: { 
+                        type: "STRING", 
+                        description: "Must be one of: WritingPrompt, GrammarPractice, or VocabularyWords." 
+                    },
+                    generatedTitle: { 
+                        type: "STRING", 
+                        description: "A short, descriptive title for the assignment." 
+                    },
+                    promptOrInstructions: { 
+                        type: "STRING", 
+                        description: "The main instruction text for the student." 
+                    },
+                    contentDetail: { 
+                        type: "STRING", 
+                        description: "The raw content of the assignment (e.g., the essay topic, the grammar sentences with blanks/verbs, or the vocabulary list/definitions). Use '___' to denote blanks in grammar sentences." 
+                    }
+                },
+                required: ["assignmentType", "generatedTitle", "promptOrInstructions", "contentDetail"]
+            }
+        };
+        
+        // --- UI UTILITY FUNCTIONS ---
+        
+        function getElement(id) {
+            return document.getElementById(id);
+        }
+
+        function showStep(stepId) {
+            const steps = [1, 2, 3, 4, 'loading'];
+            const container = getElement('app-container');
+            
+            const stepName = (typeof stepId === 'string' && stepId === 'loading') ? 'loading-screen' : `step-${stepId}`;
+
+            // Hide all steps
+            steps.forEach(id => {
+                const element = getElement(id === 'loading' ? 'loading-screen' : `step-${id}`);
+                if (element) {
+                    element.classList.add('hidden');
+                }
+            });
+
+            // Show the target step
+            const targetElement = getElement(stepName);
+            if (targetElement) {
+                targetElement.classList.remove('hidden');
+                container.scrollTop = 0; // Scroll to top on step change
+                appState.currentStep = (stepName !== 'loading-screen') ? parseInt(stepId) : 'loading';
+            }
+        }
+        
+        // --- STEP 1 LOGIC (Topic Selection) ---
+
+        function updateNextButtonStep1() {
+            const nextButton = getElement('step-1-next');
+            const hasSelection = appState.selectedTopic !== null;
+            nextButton.disabled = !hasSelection;
+            nextButton.classList.toggle('bg-indigo-400', !hasSelection);
+            nextButton.classList.toggle('bg-indigo-600', hasSelection);
+        }
+
+        function updateSelectedTopicDisplay(topicName) {
+            if (topicName) {
+                // Only clear search if topic came from a card/file
+                if (!topicName.startsWith('Search:')) {
+                     getElement('topic-search').value = '';
+                }
+                getElement('file-name-display').textContent = `Primary Topic: ${topicName}`;
+            } else {
+                getElement('file-name-display').textContent = 'No primary topic selected.';
+            }
+        }
+
+        function toggleTopic(topicId, element) {
+            const topicName = TOPICS.find(t => t.id === topicId).name;
+
+            // Clear previous selection
+            document.querySelectorAll('.card-topic.selected').forEach(card => {
+                if (card.id !== topicId) {
+                    card.classList.remove('selected');
+                }
+            });
+
+            // Set the new/current selection
+            if (element.classList.contains('selected')) {
+                element.classList.remove('selected');
+                appState.selectedTopic = null;
+            } else {
+                element.classList.add('selected');
+                appState.selectedTopic = topicName;
+            }
+
+            updateSelectedTopicDisplay(appState.selectedTopic);
+            updateNextButtonStep1();
+        }
+        
+        // Event listener for Search Input
+        function handleSearchInput() {
+            const searchInput = getElement('topic-search');
+            const searchValue = searchInput.value.trim();
+            
+            // Clear card selection if search is active
+            document.querySelectorAll('.card-topic.selected').forEach(card => card.classList.remove('selected'));
+            
+            if (searchValue) {
+                appState.selectedTopic = `Search: ${searchValue}`;
+            } else if (appState.selectedTopic && appState.selectedTopic.startsWith('Search:')) {
+                 // If search was the source and it's now empty, clear topic
+                appState.selectedTopic = null;
+            }
+            // Retain file selection if present
+            
+            updateSelectedTopicDisplay(appState.selectedTopic);
+            updateNextButtonStep1();
+        }
+
+        // Event listener for File Input (treated as a custom topic source)
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                // Clear card and search selection
+                document.querySelectorAll('.card-topic.selected').forEach(card => card.classList.remove('selected'));
+                getElement('topic-search').value = '';
+                
+                appState.selectedTopic = `File Upload: ${file.name}`;
+                getElement('file-name-display').textContent = `Custom File Topic: ${file.name}`;
+            } else {
+                appState.selectedTopic = null;
+                getElement('file-name-display').textContent = 'No file selected.';
+            }
+            updateNextButtonStep1();
+        }
+
+
+        // --- STEP 2 LOGIC (Assignment Type Selection) ---
+
+        function updateNextButtonStep2() {
+            const nextButton = getElement('step-2-next');
+            const hasSelection = appState.selectedAssignments.size > 0;
+            nextButton.disabled = !hasSelection;
+            nextButton.classList.toggle('bg-indigo-400', !hasSelection);
+            nextButton.classList.toggle('bg-indigo-600', hasSelection);
+        }
+
+        function updateSelectedAssignmentsDisplay() {
+            const selectedNames = Array.from(appState.selectedAssignments).map(id => {
+                return ASSIGNMENT_TYPES.find(a => a.id === id).name;
+            });
+            getElement('selected-assignments-display').textContent = selectedNames.length > 0 ? selectedNames.join(', ') : 'None';
+        }
+
+        function toggleAssignment(cardId, element) {
+            if (appState.selectedAssignments.has(cardId)) {
+                appState.selectedAssignments.delete(cardId);
+                element.classList.remove('selected');
+            } else if (appState.selectedAssignments.size < 3) {
+                appState.selectedAssignments.add(cardId);
+                element.classList.add('selected');
+            } else {
+                console.log("Max 3 assignment types selected."); 
+            }
+            updateNextButtonStep2();
+            updateSelectedAssignmentsDisplay();
+        }
+        
+        // --- STEP 3 LOGIC (Difficulty Selection) ---
+
+        function updateLevel(value) {
+            const index = parseInt(value);
+            const levelData = CEFR_LEVELS[index];
+            appState.cefrLevel = levelData.level;
+            
+            getElement('current-level-display').textContent = levelData.level;
+            getElement('current-level-description').textContent = levelData.description;
+        }
+
+        function toggleDescription() {
+            const content = getElement('cefr-full-description');
+            const icon = getElement('toggle-icon');
+            
+            if (content.classList.contains('open')) {
+                content.classList.remove('open');
+                icon.textContent = '▼';
+            } else {
+                // Populate full descriptions before opening
+                content.innerHTML = CEFR_LEVELS.map(data => 
+                    `<p class="mb-2"><strong class="text-indigo-600">${data.level} (${data.name}):</strong> ${data.description}</p>`
+                ).join('');
+                content.classList.add('open');
+                icon.textContent = '▲';
+            }
+        }
+        
+        // --- LLM GENERATION & API LOGIC (REMOVED: Using MOCK only now) ---
+
+        // --- MOCK API (For demonstration with robust filtering) ---
+        
+        // EXPANDED MOCK ASSIGNMENT POOL
+        // Topic Key must be a single word (e.g., 'Technology') for simple matching against TOPICS array names
+        const MOCK_ASSIGNMENT_POOL = [
+            // ==================================================================================
+            // --------------------------------- A2 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'A2', topicKey: 'Technology',
+                generatedTitle: 'My Favorite App',
+                promptOrInstructions: 'Write 5-7 simple sentences about an app you use every day. Describe what it does and why you like it.',
+                contentDetail: 'Focus on using the present tense and simple adjectives like good, fun, fast, and easy.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'A2', topicKey: 'History',
+                generatedTitle: 'Past Simple Verbs: World Events',
+                promptOrInstructions: 'Complete the sentences about history using the past simple form of the verb in parentheses.',
+                contentDetail: [
+                    "They ___ (fight) a famous battle in 1066.",
+                    "Christopher Columbus ___ (discover) America in 1492.",
+                    "The teacher ___ (show) us a documentary about Ancient Egypt.",
+                    "The scientist ___ (invent) the lightbulb in 1879."
+                ].join('\n')
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'A2', topicKey: 'Environment',
+                generatedTitle: 'Basic Nature Nouns',
+                promptOrInstructions: 'Define these simple nature words (e.g., tree, sky) and write one simple sentence for each, describing its location or color.',
+                contentDetail: [
+                    "1. Tree (n): A tall plant with a trunk and branches.",
+                    "2. River (n): A large natural stream of water.",
+                    "3. Cloud (n): A white or grey mass in the sky.",
+                    "4. Flower (n): The part of a plant that is often brightly colored."
+                ].join('\n')
+            },
+            
+            // ==================================================================================
+            // --------------------------------- B1 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'B1', topicKey: 'Technology',
+                generatedTitle: 'Social Media: Good or Bad?',
+                promptOrInstructions: 'Write two paragraphs (about 100-150 words total) expressing your opinion on whether social media is generally beneficial or harmful for people.',
+                contentDetail: 'Use appropriate linking words (e.g., *however*, *on the other hand*) and supporting reasons to structure your argument.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'B1', topicKey: 'History',
+                generatedTitle: 'Active vs. Passive Voice',
+                promptOrInstructions: 'Rewrite the following historical sentences, changing the voice as indicated in parentheses.',
+                contentDetail: [
+                    "A famous artist painted the Mona Lisa. (Change to Passive)",
+                    "The book was finished by the writer in 1950. (Change to Active)",
+                    "They believe that the war ended in 1945. (Change to Passive: Impersonal)",
+                    "The government decided to build a new monument. (Change to Passive)"
+                ].join('\n')
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'B1', topicKey: 'Environment',
+                generatedTitle: 'Simple Climate Action Vocabulary',
+                promptOrInstructions: 'Define and write a B1-level compound sentence using each of the following words in the context of environmental protection.',
+                contentDetail: [
+                    "1. Pollution (n): Harmful substances in the environment.",
+                    "2. Recycle (v): Convert waste into reusable material.",
+                    "3. Impact (n): A strong effect on something.",
+                    "4. Reserve (n): An area of land protected for animals."
+                ].join('\n')
+            },
+
+            // ==================================================================================
+            // --------------------------------- B2 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'B2', topicKey: 'Technology',
+                generatedTitle: 'The Ethics of Artificial Intelligence',
+                promptOrInstructions: 'Write a four-paragraph, cohesive essay (approx. 250 words) on a potential ethical dilemma posed by Artificial Intelligence (AI). Focus on clear topic sentences and logical paragraph transitions.',
+                contentDetail: 'The essay should be formally structured with a clear introduction and conclusion. Use relative clauses and inversion for complex sentence variety.'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'B2', topicKey: 'History',
+                generatedTitle: 'Reported Speech & Speculation',
+                promptOrInstructions: 'Rewrite the following direct speech into reported speech, using appropriate reporting verbs. Then, rewrite the final sentence using a perfect modal of speculation.',
+                contentDetail: [
+                    "The general said, 'We must retreat immediately.' (Reported)",
+                    "A witness claimed, 'I saw the incident happen near the wall.' (Reported)",
+                    "It's possible that the ancient city was abandoned due to drought. (Speculation: *might have* / *must have*)"
+                ].join('\n')
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'B2', topicKey: 'Environment',
+                generatedTitle: 'Intermediate Environmental Terms',
+                promptOrInstructions: 'Define and write a sentence for each word demonstrating your B2-level understanding of its use in environmental discussions.',
+                contentDetail: [
+                    "1. Sustainable (adj): Able to be maintained at a certain rate or level.",
+                    "2. Ecosystem (n): A biological community of interacting organisms and their physical environment.",
+                    "3. Consumption (n): The using up of a resource.",
+                    "4. Depletion (n): Reduction in the number or quantity of something."
+                ].join('\n')
+            },
+
+            // ==================================================================================
+            // --------------------------------- C1 LEVEL ASSIGNMENTS ---------------------------
+            // ==================================================================================
+            {
+                assignmentType: 'WritingPrompt', level: 'C1', topicKey: 'Technology',
+                generatedTitle: 'Critique of Digital Privacy Legislation',
+                promptOrInstructions: 'Compose a 400-word academic critique analyzing the efficacy and philosophical implications of current digital privacy legislation (e.g., GDPR). Maintain a formal, objective tone.',
+                contentDetail: 'Ensure advanced grammatical structures are used, such as inversion (e.g., *Seldom have we seen...*) and nominalization (e.g., *the measurement of data*).'
+            },
+            {
+                assignmentType: 'GrammarPractice', level: 'C1', topicKey: 'History',
+                generatedTitle: 'Inverted Conditionals & Nominalization',
+                promptOrInstructions: 'Rewrite the sentences using the specified advanced syntax (inverted conditional or nominalization).',
+                contentDetail: [
+                    "If the explorers had not brought better supplies, they would not have survived the winter. (Rewrite using Inverted Conditional)",
+                    "The historian concluded that the revolution was inevitable. (Rewrite using Nominalization: *The historian's conclusion...*)",
+                    "We need to implement these policies immediately. (Rewrite using Nominalization)"
+                ].join('\n')
+            },
+            {
+                assignmentType: 'VocabularyWords', level: 'C1', topicKey: 'Environment',
+                generatedTitle: 'Academic Ecological Terminology',
+                promptOrInstructions: 'Define and write a complex, C1-level sentence for each term, demonstrating its precise use in scientific or policy contexts.',
+                contentDetail: [
+                    "1. Anthropogenic (adj): Originating in human activity.",
+                    "2. Mitigation (n): The action of reducing the severity, seriousness, or painfulness of something.",
+                    "3. Ubiquitous (adj): Present, appearing, or found everywhere.",
+                    "4. Nexus (n): A connection or series of connections linking two or more things."
+                ].join('\n')
+            },
+        ];
+
+        // Fallback for combinations not explicitly mocked
+        const DEFAULT_FALLBACK_ASSIGNMENT = (type, topic, level) => ({
+            assignmentType: type,
+            generatedTitle: `[${type}] ${topic} - Level ${level} (Dynamic Fallback)`,
+            promptOrInstructions: `A specific mock assignment for Topic: '${topic}' and Level: '${level}' was not found. Here is a **dynamically generated fallback** that maintains the complexity of the **${level}** level.`,
+            contentDetail: type === 'GrammarPractice' ? 
+                `Complex conditional structures ___ (be) necessary for advanced academic writing. (Use inversion)` : 
+                (type === 'WritingPrompt' ? 
+                    `Write an analytical summary (200 words) on how ${topic} has influenced modern society, ensuring formal register and complex syntax appropriate for a ${level} learner.` : 
+                    `1. Prerequisite (n): A condition that must be met before something else can happen. Use this word in a formal sentence related to ${topic}.`)
+        });
+
+        async function mockGenerateAssignment() {
+            const selectedTypes = Array.from(appState.selectedAssignments).map(id => ASSIGNMENT_TYPES.find(a => a.id === id).type);
+            const generatedAssignments = [];
+            
+            // Determine the target level and a simplified topic key for matching
+            const targetLevel = appState.cefrLevel;
+            // Normalize selected topic to lowercase for flexible matching
+            const targetTopicLower = appState.selectedTopic.toLowerCase();
+            
+            // Helper to check if the mock data's topic key is found in the user's selected topic
+            const topicMatches = (mockTopicKey) => {
+                const keyLower = mockTopicKey.toLowerCase();
+                // Check if the mock key is found within the selected topic (e.g., 'tech' in 'Search: cool tech concepts')
+                return targetTopicLower.includes(keyLower);
+            };
+
+            for (const type of selectedTypes) {
+                // 1. Try to find a specific match (Type + Level + Topic)
+                let match = MOCK_ASSIGNMENT_POOL.find(a => 
+                    a.assignmentType === type && 
+                    a.level === targetLevel && 
+                    topicMatches(a.topicKey)
+                );
+                
+                // 2. If no specific match, fall back to a generic assignment for the level
+                if (!match) {
+                    match = DEFAULT_FALLBACK_ASSIGNMENT(type, appState.selectedTopic, targetLevel);
+                }
+
+                generatedAssignments.push(match);
+            }
+
+            // Simulate network latency and processing time
+            getElement('loading-message').textContent = `Fetching highly personalized mock content for Level ${appState.cefrLevel} on Topic: ${appState.selectedTopic}. All filters are now active!`;
+            await new Promise(resolve => setTimeout(resolve, 3000)); 
+            
+            return generatedAssignments;
+        }
+
+
+        async function startGeneration() {
+            if (appState.selectedAssignments.size === 0) {
+                 console.warn("No assignments selected.");
+                 return;
+            }
+
+            // 1. Transition to Loading Screen
+            showStep('loading');
+
+            try {
+                // 2. Call the MOCK API
+                const generatedAssignments = await mockGenerateAssignment(); 
+                
+                appState.generatedAssignments = generatedAssignments;
+                
+                // 3. Render Step 4
+                renderStep4(generatedAssignments);
+                showStep(4);
+
+            } catch (error) {
+                console.error("Generation failed:", error);
+                getElement('loading-message').textContent = "Generation failed. Check console for details. Returning to Difficulty Selection...";
+                
+                await new Promise(resolve => setTimeout(resolve, 2000)); 
+                showStep(3);
+            }
+        }
+
+
+        // --- STEP 4 LOGIC (Assignment Rendering) ---
+        
+        function getAssignmentTemplate(assignmentData) {
+            const { assignmentType, generatedTitle, promptOrInstructions, contentDetail } = assignmentData;
+
+            // Template for Writing (Essay) Assignment
+            if (assignmentType === 'WritingPrompt') {
+                return {
+                    description: promptOrInstructions,
+                    content: `
+                        <p class="text-gray-700 mb-4 font-medium">Prompt Details: ${contentDetail}</p>
+                        <textarea class="input-style h-64" placeholder="Start writing your essay here..."></textarea>
+                        <p class="text-sm text-gray-500 mt-2 text-right">Word Count: 0 (Manual entry)</p>
+                    `,
+                    colorClass: 'block-writing'
+                };
+            }
+            
+            // Template for Grammar (Fill-in-the-Blank) Assignment
+            if (assignmentType === 'GrammarPractice') {
+                const sentences = contentDetail.split('\n').filter(s => s.trim().length > 0);
+                const listItems = sentences.map((sentence, index) => {
+                    const formattedSentence = sentence.replace(/___/g, 
+                        `<span class="grammar-blank"><input type="text" class="input-style p-1 h-8 text-center" placeholder="Answer"></span>`
+                    );
+                    return `<li>${formattedSentence}</li>`;
+                }).join('');
+
+                return {
+                    description: promptOrInstructions,
+                    content: `<ol class="list-decimal list-inside space-y-4 text-gray-800">${listItems}</ol>`,
+                    colorClass: 'block-grammar'
+                };
+            }
+
+            // Template for Vocabulary Assignment
+            if (assignmentType === 'VocabularyWords') {
+                const vocabItems = contentDetail.split('\n').filter(s => s.trim().length > 0);
+                const vocabBlocks = vocabItems.map((item, index) => {
+                    const parts = item.split(':').map(s => s.trim());
+                    const numberAndWord = parts[0];
+                    const definition = parts.slice(1).join(':').trim();
+                    
+                    const wordMatch = numberAndWord.match(/\d+\.\s*(.*)/);
+                    const word = wordMatch ? wordMatch[1].replace(/\(.*\)/g, '').trim() : numberAndWord;
+
+                    return `
+                        <div class="p-3 border border-gray-200 rounded-lg bg-white">
+                            <p class="font-bold text-indigo-700 mb-1">${numberAndWord}:</p>
+                            <p class="text-sm text-gray-600 mb-2">Definition: ${definition || 'N/A'}</p>
+                            <input type="text" class="input-style" placeholder="Your sentence using '${word.trim()}' here...">
+                        </div>
+                    `;
+                }).join('');
+                
+                return {
+                    description: promptOrInstructions,
+                    content: `<div class="space-y-4">${vocabBlocks}</div>`,
+                    colorClass: 'block-vocabulary'
+                };
+            }
+            
+            return { description: 'Error: Unknown assignment type.', content: '', colorClass: 'block-writing' };
+        }
+
+        function renderStep4(assignments) {
+            const workspace = getElement('assignments-workspace');
+            const noMessage = getElement('no-assignments-message');
+            workspace.innerHTML = '';
+            
+            // Update Headers
+            getElement('final-topic-display').textContent = appState.selectedTopic;
+            getElement('final-level-display').textContent = appState.cefrLevel;
+
+            if (assignments.length === 0) {
+                noMessage.classList.remove('hidden');
+                return;
+            } else {
+                noMessage.classList.add('hidden');
+            }
+
+            // Sort assignments based on the global ASSIGNMENT_PRIORITY
+            const sortedAssignments = assignments.sort((a, b) => {
+                const priorityA = ASSIGNMENT_PRIORITY.indexOf(a.assignmentType);
+                const priorityB = ASSIGNMENT_PRIORITY.indexOf(b.assignmentType);
+                return priorityA - priorityB;
+            });
+
+
+            // Render blocks in the determined priority order and apply sequential numbering
+            sortedAssignments.forEach((assignmentData, index) => {
+                const template = getAssignmentTemplate(assignmentData);
+                
+                const assignmentNumber = index + 1;
+                const numberedTitle = `Assignment ${assignmentNumber}: ${assignmentData.generatedTitle}`;
+                
+                const block = document.createElement('div');
+                block.className = `assignment-block ${template.colorClass}`;
+                block.innerHTML = `
+                    <h2 class="text-2xl font-bold text-gray-900 mb-3">${numberedTitle}</h2>
+                    <p class="text-gray-700 mb-6">${template.description}</p>
+                    <div class="p-4 rounded-lg bg-white shadow-inner">
+                        ${template.content}
+                    </div>
+                `;
+                workspace.appendChild(block);
+            });
+        }
+        
+        // --- INITIALIZATION ---
+
+        function init() {
+            // Render Step 1 Cards
+            const container1 = getElement('topic-cards-container');
+            TOPICS.forEach(topic => {
+                const card = document.createElement('div');
+                card.id = topic.id;
+                card.className = 'card-topic bg-white p-6 rounded-xl flex flex-col items-center text-center hover:shadow-xl transition duration-200';
+                card.innerHTML = `<span class="text-5xl mb-3">${topic.icon}</span><span class="font-bold text-gray-800">${topic.name}</span>`;
+                card.onclick = () => toggleTopic(topic.id, card);
+                container1.appendChild(card);
+            });
+            
+            // Set up Step 1 listeners
+            getElement('topic-search').addEventListener('input', handleSearchInput);
+            getElement('custom-file').addEventListener('change', handleFileUpload);
+            getElement('step-1-next').addEventListener('click', () => showStep(2));
+            
+            // Render Step 2 Cards
+            const container2 = getElement('assignment-cards-container');
+            ASSIGNMENT_TYPES.forEach(assignment => {
+                const card = document.createElement('div');
+                card.id = assignment.id;
+                card.className = 'card-assignment bg-white p-6 rounded-xl hover:shadow-xl transition duration-200';
+                card.dataset.type = assignment.type; 
+                card.innerHTML = `
+                    <span class="text-5xl mb-3">${assignment.icon}</span>
+                    <h2 class="font-bold text-xl text-gray-800 text-center">${assignment.name}</h2>
+                    <p class="text-sm text-gray-500 text-center mt-2">${assignment.description}</p>
+                `;
+                card.onclick = () => toggleAssignment(assignment.id, card);
+                container2.appendChild(card);
+            });
+            
+            // Set up Step 2 listeners
+            getElement('step-2-back').addEventListener('click', () => showStep(1));
+            getElement('step-2-next').addEventListener('click', () => {
+                updateLevel(getElement('cefr-slider').value);
+                showStep(3);
+            });
+            
+            // Set up Step 3 listeners
+            const slider = getElement('cefr-slider');
+            slider.addEventListener('input', (event) => updateLevel(event.target.value));
+            getElement('description-toggle-header').addEventListener('click', toggleDescription);
+            getElement('step-3-back').addEventListener('click', () => showStep(2));
+            getElement('step-3-next-generate').addEventListener('click', startGeneration);
+
+            // Initial state setup: Start slider at index 3 (B2)
+            updateLevel(slider.value); 
+            updateNextButtonStep1();
+            updateNextButtonStep2();
+            showStep(1);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
